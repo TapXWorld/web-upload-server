@@ -41,18 +41,19 @@ func upload(w http.ResponseWriter, r *http.Request) {
 		year := strconv.Itoa(time.Now().Year())
 		month := strconv.Itoa(int(time.Now().Month()))
 		day := strconv.Itoa(time.Now().Day())
-		fmt.Println(SAVE_PATH)
+		bl, ext := expand(handle.Filename)
 		FINAL_PATH := SAVE_PATH + year + "/" + month + "/" + day + "/"
+		fmt.Println(FINAL_PATH)
 		if !isDirExits(FINAL_PATH) {
 			os.MkdirAll(FINAL_PATH, 0700)
 		}
-		if expand(handle.Filename) {
-			f, err := os.OpenFile(FINAL_PATH+handle.Filename, os.O_WRONLY|os.O_CREATE, 0666)
+		if bl {
+			f, err := os.OpenFile(FINAL_PATH+fileName()+"."+ext, os.O_WRONLY|os.O_CREATE, 0666)
 			io.Copy(f, file)
 			checkErr(err)
 			defer f.Close()
 			defer file.Close()
-			io.WriteString(w, DO_MAIN+SAVE_PATH+handle.Filename)
+			//io.WriteString(w, DO_MAIN+SAVE_PATH+handle.Filename)
 			fmt.Println("upload success")
 		} else {
 			io.WriteString(w, "The FileExpand No Access!")
@@ -60,15 +61,17 @@ func upload(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func expand(fileName string) bool {
+func expand(fileName string) (bool, string) {
 	var arr []string = strings.Split(fileName, ".")
 	fileExpand := arr[len(arr)-1]
+	var fileType string
 	for i := 0; i < len(EXPAND); i++ {
 		if EXPAND[i] == fileExpand {
-			return true
+			fileType = fileExpand
+			return true, fileType
 		}
 	}
-	return false
+	return false, fileType
 }
 
 func fileName() string {
