@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	//"html/template"
 	"github.com/Unknwon/goconfig"
 	"io"
 	"log"
@@ -13,12 +13,19 @@ import (
 	"time"
 )
 
+type Sizer interface {
+	Size() int64
+}
+
+type JsonData struct {
+	FileType string `json:"type"`
+	FileSize string `json:"size"`
+	FilePath string `json:"path"`
+}
+
 var buf []byte
 
-var SAVE_PATH = "./images/"
-
 func isDirExits(path string) bool {
-	fmt.Println(path)
 	fi, err := os.Stat(path)
 	checkErr(err)
 	if err != nil {
@@ -42,19 +49,24 @@ func upload(w http.ResponseWriter, r *http.Request) {
 		month := strconv.Itoa(int(time.Now().Month()))
 		day := strconv.Itoa(time.Now().Day())
 		bl, ext := expand(handle.Filename)
-		FINAL_PATH := SAVE_PATH + year + "/" + month + "/" + day + "/"
-		fmt.Println(FINAL_PATH)
+		if ext == "noExt" {
+			return
+		}
+		FINAL_PATH := "file/" + year + "/" + month + "/" + day + "/"
 		if !isDirExits(FINAL_PATH) {
 			os.MkdirAll(FINAL_PATH, 0700)
 		}
 		if bl {
-			f, err := os.OpenFile(FINAL_PATH+fileName()+"."+ext, os.O_WRONLY|os.O_CREATE, 0666)
+			FINAL_PATH += fileName() + "." + ext
+			f, err := os.OpenFile(FINAL_PATH, os.O_WRONLY|os.O_CREATE, 0666)
 			io.Copy(f, file)
 			checkErr(err)
 			defer f.Close()
 			defer file.Close()
-			//io.WriteString(w, DO_MAIN+SAVE_PATH+handle.Filename)
-			fmt.Println("upload success")
+			fileMSG := JsonData{ext, strconv.FormatInt(file.(Sizer).Size(), 10), DO_MAIN + FINAL_PATH}
+			data, err := json.Marshal(fileMSG)
+			io.WriteString(w, string(data))
+			fmt.Println("SaveFile:" + FINAL_PATH)
 		} else {
 			io.WriteString(w, "The FileExpand No Access!")
 		}
@@ -65,6 +77,10 @@ func expand(fileName string) (bool, string) {
 	var arr []string = strings.Split(fileName, ".")
 	fileExpand := arr[len(arr)-1]
 	var fileType string
+	if len(arr)-1 == 0 {
+		fmt.Println("No FileExt Name")
+		return false, "noExt"
+	}
 	for i := 0; i < len(EXPAND); i++ {
 		if EXPAND[i] == fileExpand {
 			fileType = fileExpand
@@ -82,7 +98,6 @@ func fileName() string {
 	hour := strconv.Itoa(t.Hour())
 	minute := strconv.Itoa(t.Minute())
 	second := strconv.Itoa(t.Second())
-	fmt.Println(year + month + day + hour + minute + second)
 	return year + month + day + hour + minute + second
 }
 
@@ -108,7 +123,6 @@ func checkErr(err error) {
 
 func main() {
 	initIniFile()
-	fmt.Println(fileName())
 	http.HandleFunc("/upload", upload)
 	err := http.ListenAndServe(":"+LISTEN_PORT, nil)
 	if err != nil {
